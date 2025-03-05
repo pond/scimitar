@@ -10,7 +10,7 @@ A SCIM v2 API endpoint implementation for Ruby On Rails 6.
 
 ## IMPORTANT
 
-The v1 branch for Rails 6 is now end-of-life and will no longer receive updates. Rails 7 and later are supported by Scimitar v2.x or later. Please see https://github.com/pond/scimitar/tree/main.
+The v1 branch for Rails 6 is now end-of-life and will no longer receive updates. Rails 7 and later are supported by Scimitar v2.x or later. For upgrading notes, please see https://github.com/pond/scimitar/blob/main/CHANGELOG.md#200-2022-03-04.
 
 
 
