@@ -291,6 +291,25 @@ RSpec.describe Scimitar::ApplicationController do
           expect(@exception.message).to eql('Only application/scim+json type is accepted.')
         end
       end
+
+      context 'and with Google SCIM calls' do
+        it 'reaches the controller action if the expected agent is making the request' do
+          request.headers['Content-Type'] = 'application/json'
+          request.headers['User-Agent'  ] = 'Google-Auto-Provisioning'
+          get :index
+
+          expect(@exception).to be_a(RuntimeError)
+          expect(@exception.message).to eql('Bang')
+        end
+
+        it 'is invoked early for unrecognised agents' do
+          request.headers['Content-Type'] = 'application/json'
+          get :index
+
+          expect(@exception).to be_a(Scimitar::ErrorResponse)
+          expect(@exception.message).to eql('Only application/scim+json type is accepted.')
+        end
+      end # "context 'and with Google SCIM calls' do"
     end # "context 'exception reporter' do"
   end # "context 'error handling' do"
 end

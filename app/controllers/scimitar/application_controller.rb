@@ -101,6 +101,9 @@ module Scimitar
           request.format = :scim
         elsif request.format == :scim
           request.headers['CONTENT_TYPE'] = scim_mime_type
+        elsif request.user_agent.start_with?('Google')
+          request.format = :scim
+          request.headers["CONTENT_TYPE"] = scim_mime_type
         else
           handle_scim_error(ErrorResponse.new(status: 406, detail: "Only #{scim_mime_type} type is accepted."))
         end
