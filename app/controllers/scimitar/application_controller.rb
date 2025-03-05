@@ -101,7 +101,7 @@ module Scimitar
           request.format = :scim
         elsif request.format == :scim
           request.headers['CONTENT_TYPE'] = scim_mime_type
-        elsif request.user_agent.start_with?('Google')
+        elsif request.media_type.downcase == 'application/json' && request.user_agent.start_with?('Google') # https://github.com/pond/scimitar/issues/142
           request.format = :scim
           request.headers["CONTENT_TYPE"] = scim_mime_type
         else
