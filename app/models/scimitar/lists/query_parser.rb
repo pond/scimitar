@@ -76,6 +76,22 @@ module Scimitar
       NEXT_TOKEN  = /\A(#{PAREN}|#{STR}|#{OP}|#{WORD})#{SEP}/.freeze
       IS_OPERATOR = /\A(?:#{OP})\Z/.freeze
 
+      MONGO_SIMPLE_COMPARISON_OPERATORS = {
+        "eq" => "$eq", # equal
+        "ne" => "$ne", # not equal
+        "lt" => "$lt", # less than
+        "le" => "$lte", # less than or equal
+        "gt" => "$gt", # greater than
+        "ge" => "$gte" # greater than or equal
+      }.freeze
+
+      # Present, starts with, ends with, contains
+      MONGO_COMPLEX_COMPARISON_OPERATORS = %w[pr sw ew co].freeze
+      MONGO_COMBINATION_OPERATORS = {
+        "and" => "$and",
+        "or" => "$or"
+      }.freeze
+
       # Initialise an object.
       #
       # +attribute_map+:: See Scimitar::Resources::Mixin and documentation on
@@ -180,6 +196,33 @@ module Scimitar
           base_scope:      base_scope,
           expression_tree: self.tree()
         )
+      end
+
+      # Having called #parse, call here to generate a Mongoid query
+      # For example, given this input:
+      #
+      #     userType eq "Employee" and (emails eq "a@b.com" or emails eq "a@b.org")
+      #
+      # this method will return a Mongoid query that looks like this:
+      #
+      #   {
+      #     "$and" => [
+      #       { :user_type => { "$eq" => 'Employee' } },
+      #       { "$or" => [
+      #         { :emails => { "$eq" => "a@b.com" } },
+      #         { :emails => { "$eq" => "a@b.org" } }
+      #       ]
+      #     ]
+      #  }
+      #
+      #  Use it with the Mongoid::Criteria#where method to filter results, e.g.:
+      #
+      #     User.where(parser.to_mongoid_query)
+      #
+      # Returns a Mongoid query that is the gem's
+      # best attempt at interpreting the SCIM filter string.
+      def to_mongoid_query
+        tree_node_to_mongoid_query(tree)
       end
 
       # =======================================================================
@@ -656,6 +699,70 @@ module Scimitar
           end
 
           return query
+        end
+
+        # =====================================================================
+        # Mongoid query support
+        # =====================================================================
+
+        # Recursively processes an expression tree. Calls itself with nested tree
+        # fragments. Handles three cases:
+        # 1. Combination operators (and/or) - converted to { "operator" => [condition1, condition2]}
+        # 2. Simple comparison operators (eq, ne, lt, le, gt, ge) - converted to { column => { operator => value } }
+        # 3. Complex comparison operators (pr, sw, ew, co) - converted to { column => regex }
+        # or { column => { "$exists" => true, "$ne" => nil } }
+        def tree_node_to_mongoid_query(node)
+          op = node[0]
+
+          if MONGO_COMBINATION_OPERATORS.key?(op)
+            components = node.drop(1)
+            # Parser works in a way that max number of arguments is 2 here
+            # In case the request is A && B && C, it will be parsed as A && (B && C)
+            raise "Combination operators expect two arguments: #{node}" unless components.size == 2
+
+            {
+              MONGO_COMBINATION_OPERATORS[op] => [
+                tree_node_to_mongoid_query(components[0]),
+                tree_node_to_mongoid_query(components[1])
+              ]
+            }
+          elsif MONGO_SIMPLE_COMPARISON_OPERATORS.key?(op) || MONGO_COMPLEX_COMPARISON_OPERATORS.include?(op)
+            mongoid_comparison_operation(node)
+          else
+            raise "Unsupported operator: #{op}"
+          end
+        end
+
+        def mongoid_comparison_operation(node)
+          raise "No arrays allowed in comparison subnodes: #{node}" if node.any? { |subnode| subnode.is_a?(Array) }
+
+          column = attribute_map.dig(node[1], :column)
+          raise "Unsupported field: #{node[1]}" unless column
+
+          value = node[2]&.delete("\"")
+
+          if MONGO_SIMPLE_COMPARISON_OPERATORS.key?(node[0])
+            mongoid_simple_comparison_operation(MONGO_SIMPLE_COMPARISON_OPERATORS[node[0]], column, value)
+          elsif MONGO_COMPLEX_COMPARISON_OPERATORS.include?(node[0])
+            mongoid_complex_comparison_operation(node[0], column, value)
+          end
+        end
+
+        def mongoid_simple_comparison_operation(op, column, value)
+          { column => { op => value } }
+        end
+
+        def mongoid_complex_comparison_operation(op, column, value)
+          case op
+          when "pr"
+            { column => { "$exists" => true, "$ne" => nil } }
+          when "sw"
+            { column => /^#{Regexp.escape(value)}/ }
+          when "ew"
+            { column => /#{Regexp.escape(value)}$/ }
+          when "co"
+            { column => /#{Regexp.escape(value)}/ }
+          end
         end
 
         # Apply a filter to a given base scope. Mandatory named parameters:
