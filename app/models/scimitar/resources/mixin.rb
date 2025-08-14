@@ -990,8 +990,12 @@ module Scimitar
             end
 
             found_data_for_recursion.each do | found_data |
+              extension_schema = self.class.scim_resource_type&.schemas&.detect { |schema| schema.id == path_component }
+
               attr_map = if path_component.to_sym == :root
                 with_attr_map
+              elsif extension_schema
+                with_attr_map.slice(*extension_schema.scim_attributes.map { |attr| attr.name.to_sym })
               else
                 with_attr_map[path_component.to_sym]
               end

@@ -960,12 +960,12 @@ RSpec.describe Scimitar::ActiveRecordBackedResourcesController do
         it_behaves_like 'it handles schema ID value keys without inline attributes', 'add'
         it_behaves_like 'it handles schema ID value keys without inline attributes', 'replace'
 
-        shared_examples 'it handles schema ID value keys with inline attributes' do
+        shared_examples 'it handles schema ID value keys with inline attributes' do | operation |
           it "and performs operation" do
             payload = {
               Operations: [
                 {
-                  op: 'add',
+                  op: operation,
                   value: {
                     'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:organization' => 'Foo Bar!',
                     'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department'   => 'Bar Foo!',
@@ -993,6 +993,110 @@ RSpec.describe Scimitar::ActiveRecordBackedResourcesController do
 
         it_behaves_like 'it handles schema ID value keys with inline attributes', 'add'
         it_behaves_like 'it handles schema ID value keys with inline attributes', 'replace'
+
+        shared_examples 'it handles schema ID value keys of extension schema complex attributes via path' do | operation |
+          around :each do | example |
+            module ScimSchemaExtensions
+              module User
+                class EnterpisePositionSchema < Scimitar::Schema::Base
+                  def self.scim_attributes
+                    @scim_attributes ||= [
+                      Scimitar::Schema::Attribute.new(name: 'organization', type: 'string'),
+                      Scimitar::Schema::Attribute.new(name: 'department',   type: 'string'),
+                    ]
+                  end
+                end
+
+                class EnterpisePositionComplexType < Scimitar::ComplexTypes::Base
+                  set_schema EnterpisePositionSchema
+                end
+
+                class EnterpiseManager < Scimitar::Schema::Base
+                  def initialize(options = {})
+                    super(
+                      name:            'EnterpiseManager extension schema',
+                      description:     'EnterpiseManager extension for a Enterprise User',
+                      id:              self.class.id,
+                      scim_attributes: self.class.scim_attributes
+                    )
+                  end
+
+                  def self.id
+                    'urn:ietf:params:scim:schemas:extension:enterprise_manager:1.0:User'
+                  end
+
+                  def self.scim_attributes
+                    [
+                      Scimitar::Schema::Attribute.new(name: "position", complexType: EnterpisePositionComplexType),
+                    ]
+                  end
+                end
+              end
+            end
+
+            # change SCIM attributes map temporarily
+            class << MockUser
+              alias_method :original_scim_attributes_map, :scim_attributes_map
+
+              def scim_attributes_map
+                map = original_scim_attributes_map.merge(
+                  position: {
+                    organization: :organization,
+                    department:   :department,
+                  }
+                )
+                map.delete(:organization)
+                map.delete(:department)
+                map
+              end
+            end
+
+            # change extension schemas on User temporarily
+            @original_extended_schemas = Scimitar::Resources::User.extended_schemas
+            Scimitar::Resources::User.instance_variable_set(:@extended_schemas, [])
+            Scimitar::Resources::User.extend_schema ScimSchemaExtensions::User::EnterpiseManager
+
+            example.run()
+          ensure
+            # restore original setup
+            Scimitar::Resources::User.instance_variable_set(:@extended_schemas, @original_extended_schemas)
+
+            class << MockUser
+              alias_method :scim_attributes_map, :original_scim_attributes_map
+              remove_method :original_scim_attributes_map
+            end
+          end
+
+          it "and performs operation" do
+            payload = {
+              Operations: [
+                {
+                  op: operation,
+                  path: 'urn:ietf:params:scim:schemas:extension:enterprise_manager:1.0:User:position',
+                  value: {
+                    'organization' => 'Foo Bar!',
+                    'department'   => 'Bar Foo!'
+                  },
+                },
+              ]
+            }
+
+            @u2.update!(organization: 'Old org')
+            payload = spec_helper_hupcase(payload) if force_upper_case
+            patch "/Users/#{@u2.primary_key}", params: payload.merge(format: :scim)
+
+            expect(response.status                 ).to eql(200)
+            expect(response.headers['Content-Type']).to eql('application/scim+json; charset=utf-8')
+
+            @u2.reload
+
+            expect(@u2.organization).to eql('Foo Bar!')
+            expect(@u2.department  ).to eql('Bar Foo!')
+          end
+        end
+
+        it_behaves_like 'it handles schema ID value keys of extension schema complex attributes via path', 'add'
+        it_behaves_like 'it handles schema ID value keys of extension schema complex attributes via path', 'replace'
       end
 
       it 'which patches "returned: \'never\'" fields' do
