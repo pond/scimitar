@@ -698,6 +698,54 @@ RSpec.describe Scimitar::Lists::QueryParser do
     end # "context 'complex cases' do"
   end # "context '#to_activerecord_query' do"
 
+  context "#to_mongoid_query" do
+    context "when simple queries are used" do
+      it "generates expected Mongoid eq queries" do
+        @instance.parse('name.familyName eq "Doe"')
+        query = @instance.to_mongoid_query
+
+        expect(query).to eql(last_name: { "$eq" => "Doe" })
+      end
+
+      it "generates expected Mongoid ne queries" do
+        @instance.parse('name.familyName ne "Doe"')
+        query = @instance.to_mongoid_query
+
+        expect(query).to eql(last_name: { "$ne" => "Doe" })
+      end
+    end
+
+    context "when complex comparisons are used" do
+      it "generates expected Mongoid pr queries" do
+        @instance.parse('name.givenName pr')
+        query = @instance.to_mongoid_query
+
+        expect(query).to eql(first_name: { "$exists" => true, "$ne" => nil })
+      end
+
+      it "generates expected Mongoid co queries" do
+        @instance.parse('name.familyName co "Smith"')
+        query = @instance.to_mongoid_query
+
+        expect(query).to eql(last_name: /Smith/)
+      end
+    end
+
+    context "when combinations are user" do
+      it "generates expected Mongoid queries for AND and OR" do
+        @instance.parse('name.givenName eq "Jane" and (name.familyName co "Smith" or name.familyName eq "Doe")')
+        query = @instance.to_mongoid_query
+
+        expect(query).to eql(
+          "$and" => [
+            { first_name: { "$eq" => "Jane" }},
+            { "$or" => [{ last_name: /Smith/ }, { last_name: { "$eq" => "Doe" }}]}
+          ]
+        )
+      end
+    end
+  end
+
   # ===========================================================================
   # PRIVATE METHODS
   # ===========================================================================
