@@ -140,11 +140,15 @@ module Scimitar
           authenticate_with_http_basic do |username, password|
             instance_exec(username, password, &Scimitar.engine_configuration.basic_authenticator)
           end
-        elsif Scimitar.engine_configuration.token_authenticator.present?
+        end
+
+        result ||= if Scimitar.engine_configuration.token_authenticator.present?
           authenticate_with_http_token do |token, options|
             instance_exec(token, options, &Scimitar.engine_configuration.token_authenticator)
           end
-        elsif Scimitar.engine_configuration.custom_authenticator.present?
+        end
+
+        result ||= if Scimitar.engine_configuration.custom_authenticator.present?
           instance_exec(&Scimitar.engine_configuration.custom_authenticator)
         end
 

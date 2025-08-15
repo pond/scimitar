@@ -11,8 +11,6 @@ RSpec.describe Scimitar::ApplicationController do
     end
 
     controller do
-      rescue_from StandardError, with: :handle_resource_not_found
-
       def index
         render json: { 'message' => 'cool, cool!' }, format: :scim
       end
@@ -61,6 +59,7 @@ RSpec.describe Scimitar::ApplicationController do
     end
   end
 
+
   context 'token authentication' do
     before do
       Scimitar.engine_configuration = Scimitar::EngineConfiguration.new(
@@ -71,8 +70,6 @@ RSpec.describe Scimitar::ApplicationController do
     end
 
     controller do
-      rescue_from StandardError, with: :handle_resource_not_found
-
       def index
         render json: { 'message' => 'cool, cool!' }, format: :scim
       end
@@ -182,6 +179,56 @@ RSpec.describe Scimitar::ApplicationController do
           expect(parsed_body).to eql('testing' => true)
         end
       end
+    end
+  end
+
+  context 'authentication cascade' do
+    before do
+      Scimitar.engine_configuration = Scimitar::EngineConfiguration.new(
+        basic_authenticator:  -> (username, password) { username == 'A' && password == 'B' },
+        token_authenticator:  -> (token,    options ) { token == 'A' },
+        custom_authenticator: ->                      { params[:let_me_in] == 'A' },
+      )
+    end
+
+    controller do
+      def index
+        render json: { 'message' => 'cool, cool!' }, format: :scim
+      end
+    end
+
+    it 'basic first' do
+      request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials('A', 'B')
+
+      get :index, params: { format: :scim }
+      expect(response).to be_ok
+
+      request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials('A', 'Wrong')
+
+      get :index, params: { format: :scim }
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'token after basic' do
+      request.env['HTTP_AUTHORIZATION'] = 'Bearer A'
+
+      get :index, params: { format: :scim }
+      expect(response).to be_ok
+
+      request.env['HTTP_AUTHORIZATION'] = 'Bearer B'
+
+      get :index, params: { format: :scim }
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'custom after basic and token' do
+      request.env['HTTP_AUTHORIZATION'] = 'Bearer Wrong'
+
+      get :index, params: { format: :scim, let_me_in: 'A' }
+      expect(response).to be_ok
+
+      get :index, params: { format: :scim, let_me_in: 'Wrong' }
+      expect(response).to have_http_status(:unauthorized)
     end
   end
 
