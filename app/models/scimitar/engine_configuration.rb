@@ -11,6 +11,7 @@ module Scimitar
       :uses_defaults,
       :basic_authenticator,
       :token_authenticator,
+      :custom_authenticator,
       :application_controller_mixin,
       :exception_reporter,
       :optional_value_fields_required,

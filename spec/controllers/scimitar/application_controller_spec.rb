@@ -107,6 +107,61 @@ RSpec.describe Scimitar::ApplicationController do
     end
   end
 
+  context 'custom authentication, using Warden as an example' do
+    include Warden::Test::Helpers
+
+    before do
+      Scimitar.engine_configuration = Scimitar::EngineConfiguration.new(
+        custom_authenticator: Proc.new do
+          catch(:warden) do
+            response.headers['WWW-Authenticate'] = 'SomeOtherValidScheme'
+
+            warden = request.env['warden']
+            warden.authenticate!(scope: :scim_v2)
+            true
+          end or false
+        end
+      )
+    end
+
+    controller do
+      def index
+        render json: { 'message' => 'cool, cool!' }, format: :scim
+      end
+    end
+
+    context 'when authentication suceeds' do
+      it 'renders "success"' do
+        expect(warden).to receive(:authenticate!).and_return("A User instance or similar")
+
+        get :index, params: { format: :scim }
+
+        expect(response).to be_ok
+        expect(JSON.parse(response.body)).to eql({ 'message' => 'cool, cool!' })
+        expect(response.headers['WWW-Authenticate']).to eql('SomeOtherValidScheme') # Proves the custom block ran
+      end
+    end
+
+    context 'when authentication fails' do # We're kinda just verifying the README.md example code here!
+      before do
+        Warden::Strategies.add(:scim) do
+          def authenticate!
+            fail!("Some failure message")
+          end
+        end
+      end
+
+      it 'renders 401' do
+        expect(warden).to receive(:authenticate!) { throw(:warden) }
+
+        get :index, params: { format: :scim }
+
+        expect(response).not_to be_ok
+        expect(response.headers['WWW-Authenticate']).to eql('SomeOtherValidScheme') # Proves the custom block ran
+      end
+    end
+  end
+
   context 'authenticator evaluated within controller context' do
 
     # Define a controller with a custom instance method 'valid_token'.

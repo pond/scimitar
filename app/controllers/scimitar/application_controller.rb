@@ -130,7 +130,9 @@ module Scimitar
       end
 
       def authenticate
-        handle_scim_error(Scimitar::AuthenticationError.new) unless authenticated?
+        unless authenticated?
+          handle_scim_error(Scimitar::AuthenticationError.new) unless self.performed?
+        end
       end
 
       def authenticated?
@@ -138,12 +140,12 @@ module Scimitar
           authenticate_with_http_basic do |username, password|
             instance_exec(username, password, &Scimitar.engine_configuration.basic_authenticator)
           end
-        end
-
-        result ||= if Scimitar.engine_configuration.token_authenticator.present?
+        elsif Scimitar.engine_configuration.token_authenticator.present?
           authenticate_with_http_token do |token, options|
             instance_exec(token, options, &Scimitar.engine_configuration.token_authenticator)
           end
+        elsif Scimitar.engine_configuration.custom_authenticator.present?
+          instance_exec(&Scimitar.engine_configuration.custom_authenticator)
         end
 
         return result
