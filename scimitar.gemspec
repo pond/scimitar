@@ -33,11 +33,13 @@ Gem::Specification.new do |s|
     s.add_dependency 'rails', '>= 7.0' # Major version 7 or later
   end
 
-  s.add_development_dependency 'debug',          '~>  1.10'
-  s.add_development_dependency 'rake',           '~> 13.2'
-  s.add_development_dependency 'pg',             '~>  1.5'
-  s.add_development_dependency 'simplecov-rcov', '~>  0.3'
-  s.add_development_dependency 'rdoc',           '~>  6.12'
-  s.add_development_dependency 'rspec-rails',    '~>  7.1'
-  s.add_development_dependency 'doggo',          '~>  1.4'
+  s.add_development_dependency 'debug',              '~>  1.11'
+  s.add_development_dependency 'rake',               '~> 13.2'
+  s.add_development_dependency 'pg',                 '~>  1.6'
+  s.add_development_dependency 'simplecov-rcov',     '~>  0.3'
+  s.add_development_dependency 'rdoc',               '~>  6.14'
+  s.add_development_dependency 'warden',             '~>  1.2'
+  s.add_development_dependency 'rspec-rails',        '~>  7.1'
+  s.add_development_dependency 'warden-rspec-rails', '~>  0.3'
+  s.add_development_dependency 'doggo',              '~>  1.4'
 end
