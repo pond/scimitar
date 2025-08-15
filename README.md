@@ -123,7 +123,7 @@ Here's an example where Warden is being used for authentication, with Warden sto
 
 ```ruby
 Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
-  custome_authenticator: Proc.new do
+  custom_authenticator: Proc.new do
 
     # In this example we catch the Warden 'throw' for failed authentication, as
     # well as allowing Warden to successfully find an *authenticated* user, but
