@@ -58,21 +58,23 @@ All three are provided under the MIT license. Scimitar is too.
 
 Scimitar is best used with Rails and ActiveRecord, but it can be used with other persistence back-ends too - you just have to do more of the work in controllers using Scimitar's lower level controller subclasses, rather than relying on Scimitar's higher level ActiveRecord abstractions.
 
-### Authentication
-
-Noting the _Security_ section later - to set up an authentication method, create a `config/initializers/scimitar.rb` in your Rails application and define a token-based authenticato, a basic username-password authenticator or a custom authenticator in the [engine configuration section documented in the sample file](https://github.com/pond/scimitar/blob/main/config/initializers/scimitar.rb) and examples of these are given in the sub-sections below. In all cases, it boils down to a `Proc` that you define which is invoked for every handled request. Your `Proc` code executes as if it were an instance method of an ApplicationController subclass which is handling a `before_action` callback in the normal Rails fashion, so it has full access to all the usual Rails objects such as `request` and `response`.
-
-**Strongly recommended:** You should wrap any Scimitar configuration with `Rails.application.config.to_prepare do...` so that any changes you make to configuration during local development are reflected via auto-reload, rather than requiring a server restart.
+Some aspects of configuration are handled via a `config/initializers/scimitar.rb` file. It is **strongly recommended** that you wrap Scimitar configuration with `Rails.application.config.to_prepare do...` so that any changes you make to configuration during local development are reflected via auto-reload, rather than requiring a server restart:
 
 ```ruby
 Rails.application.config.to_prepare do
   Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
-    # ...
+    # ...see subsections below for configuration options...
   end
 end
 ```
 
 In general, Scimitar's own development and tests assume this approach. If you choose to put the configuration directly into an initializer file without the `to_prepare` wrapper, you will be at a _slightly_ higher risk of tripping over unrecognised Scimitar bugs; please make sure that your own application test coverage is reasonably comprehensive.
+
+### Authentication
+
+You can define a token-based authenticator, a basic username-password authenticator or a custom authenticator in the [engine configuration section documented in the sample file](https://github.com/pond/scimitar/blob/main/config/initializers/scimitar.rb) and examples of these are given in the sub-sections below. In all cases, it boils down to a `Proc` that you define which is invoked for every handled request. Your `Proc` code executes as if it were an instance method of an ApplicationController subclass which is handling a `before_action` callback in the normal Rails fashion, so it has full access to all the usual Rails objects such as `request` and `response`.
+
+Please take note of the _Security_ section later for additional information related to authorisation, as well as other security considerations.
 
 #### Token-based
 
@@ -113,7 +115,7 @@ Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
 
 Scimitar returns either a 401 error if your block evaluated to `false`, else consider the request authenticated and set HTTP header `WWW-Authenticate` to a value of **`Basic`** in the response per [RFC 7644](https://tools.ietf.org/html/rfc7644#section-2).
 
-#### Custom authenticators
+#### Custom
 
 To fully take over authentication, you can supply a custom authenticator. If the authentication mechanism you're using does not already do so, **you become responsible for setting an appropriate value for the `WWW-Authenticate` header** in your response to indicate the appropriate authentication type. Scimitar won't do that itself, since it doesn't know what approach your custom code is using.
 
@@ -125,7 +127,7 @@ Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
 
     # In this example we catch the Warden 'throw' for failed authentication, as
     # well as allowing Warden to successfully find an *authenticated* user, but
-    # then fail *authorization* based on some hypothetical permissions check.
+    # then fail *authorisation* based on some hypothetical permissions check.
     #
     catch(:warden) do
       response.headers['WWW-Authenticate'] = '...something...'
@@ -139,7 +141,7 @@ Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
 })
 ```
 
-If you _only_ wanted Warden authentication and not further authorization, that block becomes even simpler:
+If you _only_ wanted Warden authentication and not further authorisation, that block becomes even simpler:
 
 ```ruby
 catch(:warden) do
