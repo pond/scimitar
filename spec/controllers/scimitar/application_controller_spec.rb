@@ -110,54 +110,77 @@ RSpec.describe Scimitar::ApplicationController do
   context 'custom authentication, using Warden as an example' do
     include Warden::Test::Helpers
 
-    before do
-      Scimitar.engine_configuration = Scimitar::EngineConfiguration.new(
-        custom_authenticator: Proc.new do
-          catch(:warden) do
-            response.headers['WWW-Authenticate'] = 'SomeOtherValidScheme'
-
-            warden = request.env['warden']
-            warden.authenticate!(scope: :scim_v2)
-            true
-          end or false
-        end
-      )
-    end
-
     controller do
       def index
         render json: { 'message' => 'cool, cool!' }, format: :scim
       end
     end
 
-    context 'when authentication suceeds' do
-      it 'renders "success"' do
-        expect(warden).to receive(:authenticate!).and_return("A User instance or similar")
-
-        get :index, params: { format: :scim }
-
-        expect(response).to be_ok
-        expect(JSON.parse(response.body)).to eql({ 'message' => 'cool, cool!' })
-        expect(response.headers['WWW-Authenticate']).to eql('SomeOtherValidScheme') # Proves the custom block ran
-      end
-    end
-
-    context 'when authentication fails' do # We're kinda just verifying the README.md example code here!
+    context 'with standard 401 handling' do
       before do
-        Warden::Strategies.add(:scim) do
-          def authenticate!
-            fail!("Some failure message")
+        Scimitar.engine_configuration = Scimitar::EngineConfiguration.new(
+          custom_authenticator: Proc.new do
+            catch(:warden) do
+              response.headers['WWW-Authenticate'] = 'SomeOtherValidScheme'
+
+              warden = request.env['warden']
+              warden.authenticate!(scope: :scim_v2)
+              true
+            end or false
           end
+        )
+      end
+
+      context 'when authentication suceeds' do
+        it 'renders "success"' do
+          expect(warden).to receive(:authenticate!).and_return("A User instance or similar") # ('warden' is the proxy provided by the warden-rspec-rails gem)
+
+          get :index, params: { format: :scim }
+
+          expect(response).to be_ok
+          expect(JSON.parse(response.body)).to eql({ 'message' => 'cool, cool!' })
+          expect(response.headers['WWW-Authenticate']).to eql('SomeOtherValidScheme') # Proves the custom block ran
         end
       end
 
-      it 'renders 401' do
-        expect(warden).to receive(:authenticate!) { throw(:warden) }
+      context 'when authentication fails' do # We're kinda just verifying the README.md example code here!
+        it 'renders 401' do
+          expect(warden).to receive(:authenticate!) { throw(:warden) } # ('warden' is the proxy provided by the warden-rspec-rails gem)
 
-        get :index, params: { format: :scim }
+          get :index, params: { format: :scim }
 
-        expect(response).not_to be_ok
-        expect(response.headers['WWW-Authenticate']).to eql('SomeOtherValidScheme') # Proves the custom block ran
+          expect(response).to have_http_status(:unauthorized)
+          expect(response.headers['WWW-Authenticate']).to eql('SomeOtherValidScheme') # Proves the custom block ran
+
+          parsed_body = JSON.parse(response.body)
+
+          expect(parsed_body).to include('schemas' => ['urn:ietf:params:scim:api:messages:2.0:Error'])
+          expect(parsed_body).to include('detail' => 'Requires authentication')
+          expect(parsed_body).to include('status' => '401')
+        end
+      end
+    end
+
+    context 'with custom error handling' do
+      before do
+        Scimitar.engine_configuration = Scimitar::EngineConfiguration.new(
+          custom_authenticator: Proc.new do
+            render status: 499, json: { testing: true }
+            false
+          end
+        )
+      end
+
+      context 'when authentication fails' do
+        it 'renders the custom response' do
+          get :index, params: { format: :scim }
+
+          expect(response).to have_http_status(499)
+
+          parsed_body = JSON.parse(response.body)
+
+          expect(parsed_body).to eql('testing' => true)
+        end
       end
     end
   end
