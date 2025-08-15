@@ -86,6 +86,18 @@ Rails.application.config.to_prepare do # (required for >= Rails 7 / Zeitwerk)
     # Note that both basic and token authentication can be declared, with the
     # parameters in the inbound HTTP request determining which is invoked.
 
+    # If you want to support a custom authenticfation method:
+    #
+    #     custom_authenticator: Proc.new do
+    #       # Custom code here. don't forget to set a WWW-Authenticate header:
+    #       response.headers['WWW-Authenticate'] = '...something...'
+    #       # ...and evaluate to 'true' for success or 'false' for failure.
+    #     end
+    #
+    # If a basic and/or token authenticator has also been defined, then they're
+    # called first. The code will cascade through trying each and only call a
+    # custom authenticator if other mechanisms fail to authenticate.
+
     # Scimitar rescues certain error cases and exceptions, in order to return a
     # JSON response to the API caller. If you want exceptions to also be
     # reported to a third party system such as sentry.io or raygun.com, you can

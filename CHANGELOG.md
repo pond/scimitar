@@ -1,3 +1,15 @@
+# 2.12.0 (2025-08-15)
+
+Fixes:
+
+* `PATCH` could fail to work as expected with extension schemas using complex type attributes. The problem arose if using a single `path` that pointed to the complex attribute with a Hash (object) value containing field-value pairs, rather than `path`s pointing all the way down to individual attribute fields with simple values - see [#160](https://github.com/pond/scimitar/pull/160) - thanks to `@aerodynamik`
+* Works around an issue with Google Workspace - fixes [#142](https://github.com/pond/scimitar/issues/142) via [#161](https://github.com/pond/scimitar/pull/161) - thanks to `@kewnt`
+
+Features:
+
+* MongoDB support through Mongoid queries; see [#159](https://github.com/pond/scimitar/pull/159) for more - thanks to `@andriisereda-st`
+* Proper support for fully custom authorisation, fixing [#158](https://github.com/pond/scimitar/issues/158) via [#162](https://github.com/pond/scimitar/pull/162) - thanks to `@NobodysNightmare`
+
 # 2.11.0 (2025-03-05)
 
 Maintenance:

@@ -2,7 +2,7 @@
 
 [![Gem Version](https://badge.fury.io/rb/scimitar.svg)](https://badge.fury.io/rb/scimitar)
 [![Build Status](https://github.com/pond/scimitar/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/pond/scimitar/actions/)
-[![License](https://img.shields.io/badge/license-mit-blue.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/license-mit-blue.svg)](https://github.com/pond/scimitar/blob/main/LICENSE.txt)
 
 A SCIM v2 API endpoint implementation for Ruby On Rails.
 
@@ -58,17 +58,35 @@ All three are provided under the MIT license. Scimitar is too.
 
 Scimitar is best used with Rails and ActiveRecord, but it can be used with other persistence back-ends too - you just have to do more of the work in controllers using Scimitar's lower level controller subclasses, rather than relying on Scimitar's higher level ActiveRecord abstractions.
 
+Some aspects of configuration are handled via a `config/initializers/scimitar.rb` file. It is **strongly recommended** that you wrap Scimitar configuration with `Rails.application.config.to_prepare do...` so that any changes you make to configuration during local development are reflected via auto-reload, rather than requiring a server restart:
+
+```ruby
+Rails.application.config.to_prepare do
+  Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
+    # ...see subsections below for configuration options...
+  end
+end
+```
+
+In general, Scimitar's own development and tests assume this approach. If you choose to put the configuration directly into an initializer file without the `to_prepare` wrapper, you will be at a _slightly_ higher risk of tripping over unrecognised Scimitar bugs; please make sure that your own application test coverage is reasonably comprehensive.
+
 ### Authentication
 
-Noting the _Security_ section later - to set up an authentication method, create a `config/initializers/scimitar.rb` in your Rails application and define a token-based authenticator and/or a username-password authenticator in the [engine configuration section documented in the sample file](https://github.com/pond/scimitar/blob/main/config/initializers/scimitar.rb). For example:
+You can define a token-based authenticator, a basic username-password authenticator or a custom authenticator in the [engine configuration section documented in the sample file](https://github.com/pond/scimitar/blob/main/config/initializers/scimitar.rb) and examples of these are given in the sub-sections below. In all cases, it boils down to a `Proc` that you define which is invoked for every handled request. Your `Proc` code executes as if it were an instance method of an ApplicationController subclass which is handling a `before_action` callback in the normal Rails fashion, so it has full access to all the usual Rails objects such as `request` and `response`.
+
+Please take note of the _Security_ section later for additional information related to authorisation, as well as other security considerations.
+
+#### Token-based
+
+The `Proc` shown below must evaluate to `true` or `false`. The way you do that is up to you; in the examples below, code within the `Proc.new` block is just for illustration.
 
 ```ruby
 Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
   token_authenticator: Proc.new do | token, options |
 
-    # This is where you'd write the code to validate `token` - the means by
+    # This is where you'd write the code to validate `token`. The means by
     # which your application issues tokens to SCIM clients, or validates them,
-    # is outside the scope of the gem; the required mechanisms vary by client.
+    # is outside the scope of the gem. The required mechanisms vary by client.
     # More on this can be found in the 'Security' section later.
     #
     SomeLibraryModule.validate_access_token(token)
@@ -77,19 +95,65 @@ Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
 })
 ```
 
-When it comes to token access, Scimitar neither enforces nor presumes any kind of encoding for bearer tokens. You can use anything you like, including encoding/encrypting JWTs if you so wish - https://rubygems.org/gems/jwt may be useful. The way in which a client might integrate with your SCIM service varies by client and you will have to check documentation to see how a token gets conveyed to that client in the first place (e.g. a full OAuth flow with your application, or just a static token generated in some UI which an administrator copies and pastes into their client's SCIM configuration UI).
+Scimitar returns either a 401 error if your block evaluated to `false`, else consider the request authenticated and set HTTP header `WWW-Authenticate` to a value of **`Bearer`(( in the response per [RFC 7644](https://tools.ietf.org/html/rfc7644#section-2).
 
-**Strongly recommended:** You should wrap any Scimitar configuration with `Rails.application.config.to_prepare do...` so that any changes you make to configuration during local development are reflected via auto-reload, rather than requiring a server restart.
+Scimitar neither enforces nor presumes any kind of encoding for bearer tokens. You can use anything you like, including encoding/encrypting JWTs if you so wish - https://rubygems.org/gems/jwt may be useful. The way in which a client might integrate with your SCIM service varies by client and you will have to check documentation to see how a token gets conveyed to that client in the first place (e.g. a full OAuth flow with your application, or just a static token generated in some UI which an administrator copies and pastes into their client's SCIM configuration UI).
+
+#### Username and password-based
+
+For username/passwords, use something like this (again, the code inside the `Proc` is just an illustration):
 
 ```ruby
-Rails.application.config.to_prepare do
-  Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
-    # ...
+Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
+  basic_authenticator: Proc.new do | username, password |
+
+    User.find_by_username(username)&.valid_password?(password) || false
+
   end
-end
+})
 ```
 
-In general, Scimitar's own development and tests assume this approach. If you choose to put the configuration directly into an initializer file without the `to_prepare` wrapper, you will be at a _slightly_ higher risk of tripping over unrecognised Scimitar bugs; please make sure that your own application test coverage is reasonably comprehensive.
+Scimitar returns either a 401 error if your block evaluated to `false`, else consider the request authenticated and set HTTP header `WWW-Authenticate` to a value of **`Basic`** in the response per [RFC 7644](https://tools.ietf.org/html/rfc7644#section-2).
+
+#### Custom
+
+To fully take over authentication, you can supply a custom authenticator. If the authentication mechanism you're using does not already do so, **you become responsible for setting an appropriate value for the `WWW-Authenticate` header** in your response to indicate the appropriate authentication type. Scimitar won't do that itself, since it doesn't know what approach your custom code is using.
+
+Here's an example where Warden is being used for authentication, with Warden storing the authenticated information under a scope of `scim_v2` in this case, so the user could be later read back using `warden.user(:scim_v2)` (though you can use any Warden scope name you want, of course, or not use any authentication scope at all).
+
+```ruby
+Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
+  custome_authenticator: Proc.new do
+
+    # In this example we catch the Warden 'throw' for failed authentication, as
+    # well as allowing Warden to successfully find an *authenticated* user, but
+    # then fail *authorisation* based on some hypothetical permissions check.
+    #
+    catch(:warden) do
+      response.headers['WWW-Authenticate'] = '...something...'
+
+      warden = request.env["warden"]
+      user   = warden.authenticate!(scope: :scim_v2)
+      user.can_use_scim? # (just a hypothetical User model method that might check some permissions)
+    end or false
+
+  end
+})
+```
+
+If you _only_ wanted Warden authentication and not further authorisation, that block becomes even simpler:
+
+```ruby
+catch(:warden) do
+  response.headers['WWW-Authenticate'] = '...something...'
+
+  warden = request.env["warden"]
+  warden.authenticate!(scope: :scim_v2) # This'll either throw (caught -> block 'nil' -> "or false" -> false), else continue
+  true # If we reach this line, Warden didn't throw, so authentication was successful
+end or false
+```
+
+Scimitar handles `false` responses for you, rendering a `401` response, _but_ you can override that for even more customised behaviour if you want. Should your Proc have already responded, either by calling `handle_scim_error` and passing it an instance of an `Exception` - e.g. the `Scimitar::ErrorResponse` subclass of `Exception` initialised with `status: <HTTP status code>, detail: "error message"`) - or by any other means, then Scimitar won't render its standard 401 at all and your code becomes responsible for the returned JSON payload.
 
 ### Routes
 
@@ -117,6 +181,10 @@ Internally Scimitar always invokes URL helpers in the controller layer. I.e. any
 #### Okta note
 
 Note that Okta has some [curious documentation on its use of `POST` vs `PATCH` for Groups](https://developer.okta.com/docs/api/openapi/okta-scim/guides/scim-20/#update-a-specific-group-name), which per [this Scimitar issue](https://github.com/pond/scimitar/issues/153#issuecomment-2468897194) has caused at least one person some trouble. Defining the routes for both verbs as shown above (though in that issue's case, it was for the Group resource) _does_ still seem to work, but take care if integrating with Okta to try and at least manually test, if not auto-test, `PATCH`/`PUT` operations initiated from Okta's side, just to make sure.
+
+### Google Workspace note
+
+Using SCIM with Google Workspace might only work for a subset of applications. Since web UIs for major service providers change very often, it doesn't make sense to provide extensive documentation here as it would get out of date quickly; you may have to figure out the setup as best you can using whatever current Google documentation exists for their system. There are [some notes which were relevant around mid-2025](https://github.com/pond/scimitar/issues/142#issuecomment-2699050541) (from when a workarond/fix was incorporated into Scimitar to allow it to work with Google Workspace) which may help you get started.
 
 ### Data models
 
