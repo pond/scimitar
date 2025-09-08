@@ -17,6 +17,11 @@ Rails.application.routes.draw do
   get    'Groups/:id', to: 'mock_groups#show'
   patch  'Groups/:id', to: 'mock_groups#update'
 
+  # Batch lookup variant for testing find_all_with
+  get    'BatchGroups',     to: 'mock_batch_groups#index'
+  get    'BatchGroups/:id', to: 'mock_batch_groups#show'
+  patch  'BatchGroups/:id', to: 'mock_batch_groups#update'
+
   # For testing blocks passed to ActiveRecordBackedResourcesController#create,
   # #update, #replace and #destroy.
   #
