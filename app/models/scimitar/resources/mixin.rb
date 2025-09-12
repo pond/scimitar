@@ -145,7 +145,8 @@ module Scimitar
     #             display: :full_name  # <-- i.e. Team.users[n].full_name
     #           },
     #           class: Team, # Optional; see below
-    #           find_with: -> (scim_list_entry) {...} # See below
+    #           find_with:      -> (scim_list_entry) {...}, # See below
+    #           find_all_with:  -> (scim_list_entries) {...} # Optional, See below
     #         }
     #       ],
     #       #...
@@ -164,6 +165,11 @@ module Scimitar
     # recommended but not really *needed* unless the configuration option
     # Scimitar::EngineConfiguration::schema_list_from_attribute_mappings is
     # defined; see documentation of that option for more information.
+    #
+    # To avoid N+1 queries when resolving many entries (e.g. Group members
+    # during PATCH), you can instead provide ":find_all_with" which is passed
+    # the entire Array of SCIM entries and should return an Array of resolved
+    # model instances. If both are provided, ":find_all_with" is preferred.
     #
     # Note that you can only use either:
     #
@@ -315,7 +321,7 @@ module Scimitar
                     enum.each do | static_or_dynamic_mapping |
                       if static_or_dynamic_mapping.key?(:match) # Static
                         extractor.call(static_or_dynamic_mapping[:using])
-                      elsif static_or_dynamic_mapping.key?(:find_with) # Dynamic
+                      elsif static_or_dynamic_mapping.key?(:find_with) || static_or_dynamic_mapping.key?(:find_all_with) # Dynamic
                         @scim_mutable_attributes << static_or_dynamic_mapping[:list]
                       end
                     end
@@ -839,9 +845,17 @@ module Scimitar
                     method    = "#{mapped_array_entry[:list]}="
 
                     if (attribute&.mutability == 'readWrite' || attribute&.mutability == 'writeOnly') && self.respond_to?(method)
-                      find_with_proc = mapped_array_entry[:find_with]
+                      find_all_with_proc = mapped_array_entry[:find_all_with]
+                      find_with_proc     = mapped_array_entry[:find_with]
 
-                      unless find_with_proc.nil?
+                      if find_all_with_proc.respond_to?(:call)
+                        scim_entries = (scim_hash_or_leaf_value || [])
+                        mapped_list  = find_all_with_proc.call(scim_entries) || []
+
+                        mapped_list.compact!
+
+                        self.public_send(method, mapped_list)
+                      elsif find_with_proc.respond_to?(:call)
                         mapped_list = (scim_hash_or_leaf_value || []).map do | source_list_entry |
                           find_with_proc.call(source_list_entry)
                         end

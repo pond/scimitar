@@ -840,6 +840,36 @@ RSpec.describe Scimitar::ActiveRecordBackedResourcesController do
 
   context '#update' do
     shared_examples 'an updater' do | force_upper_case: |
+    context "when updating group members using :find_all_with" do
+      it "uses :find_all_with to batch-resolve users and updates associations" do
+        payload = {
+          schemas: [ 'urn:ietf:params:scim:api:messages:2.0:PatchOp' ],
+          Operations: [
+            {
+              op:   'add',
+              path: 'members',
+              value: [
+                { 'value' => @u1.primary_key },
+                { 'value' => @u2.primary_key }
+              ]
+            }
+          ]
+        }
+
+        patch "/BatchGroups/#{@g1.id}", params: payload.merge({ format: :scim })
+
+        expect(response.status).to eql(200)
+
+        # Verify membership updated
+        get "/BatchGroups/#{@g1.id}", params: { format: :scim }
+        expect(response.status).to eql(200)
+        result = JSON.parse(response.body)
+
+        values = result.fetch('members', []).map { |m| m['value'] }
+        expect(values).to include(@u1.primary_key.to_s)
+        expect(values).to include(@u2.primary_key.to_s)
+      end
+    end
       it 'which patches regular attributes' do
         payload = {
           Operations: [
