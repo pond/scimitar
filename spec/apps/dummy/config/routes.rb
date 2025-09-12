@@ -17,7 +17,8 @@ Rails.application.routes.draw do
   get    'Groups/:id', to: 'mock_groups#show'
   patch  'Groups/:id', to: 'mock_groups#update'
 
-  # Batch lookup variant for testing find_all_with
+  # Batch lookup variant for testing the mixin 'find_all_with' option.
+  #
   get    'BatchGroups',     to: 'mock_batch_groups#index'
   get    'BatchGroups/:id', to: 'mock_batch_groups#show'
   patch  'BatchGroups/:id', to: 'mock_batch_groups#update'
