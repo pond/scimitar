@@ -840,36 +840,6 @@ RSpec.describe Scimitar::ActiveRecordBackedResourcesController do
 
   context '#update' do
     shared_examples 'an updater' do | force_upper_case: |
-    context "when updating group members using :find_all_with" do
-      it "uses :find_all_with to batch-resolve users and updates associations" do
-        payload = {
-          schemas: [ 'urn:ietf:params:scim:api:messages:2.0:PatchOp' ],
-          Operations: [
-            {
-              op:   'add',
-              path: 'members',
-              value: [
-                { 'value' => @u1.primary_key },
-                { 'value' => @u2.primary_key }
-              ]
-            }
-          ]
-        }
-
-        patch "/BatchGroups/#{@g1.id}", params: payload.merge({ format: :scim })
-
-        expect(response.status).to eql(200)
-
-        # Verify membership updated
-        get "/BatchGroups/#{@g1.id}", params: { format: :scim }
-        expect(response.status).to eql(200)
-        result = JSON.parse(response.body)
-
-        values = result.fetch('members', []).map { |m| m['value'] }
-        expect(values).to include(@u1.primary_key.to_s)
-        expect(values).to include(@u2.primary_key.to_s)
-      end
-    end
       it 'which patches regular attributes' do
         payload = {
           Operations: [
@@ -1165,6 +1135,39 @@ RSpec.describe Scimitar::ActiveRecordBackedResourcesController do
         expect(@u2.home_email_address).to eql('home_2@test.com')
         expect(@u2.work_email_address).to be_nil
         expect(@u2.password).to eql('correcthorsebatterystaple')
+      end
+
+      context "when updating group members using :find_all_with" do
+        it "uses :find_all_with to batch-resolve users and updates associations" do
+          payload = {
+            schemas: [ 'urn:ietf:params:scim:api:messages:2.0:PatchOp' ],
+            Operations: [
+              {
+                op:   'add',
+                path: 'members',
+                value: [
+                  { 'value' => @u1.primary_key },
+                  { 'value' => @u2.primary_key }
+                ]
+              }
+            ]
+          }
+
+          payload = spec_helper_hupcase(payload) if force_upper_case
+
+          patch "/BatchGroups/#{@g1.id}", params: payload.merge({ format: :scim })
+
+          expect(response.status).to eql(200)
+
+          # Verify membership updated
+          get "/BatchGroups/#{@g1.id}", params: { format: :scim }
+          expect(response.status).to eql(200)
+          result = JSON.parse(response.body)
+
+          values = result.fetch('members', []).map { |m| m['value'] }
+          expect(values).to include(@u1.primary_key.to_s)
+          expect(values).to include(@u2.primary_key.to_s)
+        end
       end
 
       context 'which clears attributes' do
