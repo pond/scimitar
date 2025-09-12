@@ -1,3 +1,13 @@
+# 2.13.0 (2025-09-12)
+
+Fixes:
+
+* _Actually_ works around an issue with Google Workspace; the PR intended for v2.12.0 did not get merged (facepalm - sorry!) - fixes [#142](https://github.com/pond/scimitar/issues/142) via [#161](https://github.com/pond/scimitar/pull/161) - thanks to `@kewnt`
+
+Features:
+
+* Support for `find_all_with` in the `scim_attributes_map`, to opt-in eliminate N+1 queries in some use cases - fixes [#157](https://github.com/pond/scimitar/issues/157) via [#164](https://github.com/pond/scimitar/pull/164/) - thanks to `@shuyahonda`
+
 # 2.12.0 (2025-08-15)
 
 Fixes:

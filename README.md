@@ -255,8 +255,8 @@ class User < ActiveRecord::Base
       ],
 
       # NB The 'groups' collection in a SCIM User resource is read-only, so
-      #    we provide no ":find_with" key for looking up records for writing
-      #    updates to the associated collection.
+      #    we provide no ":find_with" or ":find_all_with" key for looking up
+      #    records for writing updates to the associated collection.
       #
       groups: [
         {

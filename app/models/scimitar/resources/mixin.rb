@@ -145,8 +145,8 @@ module Scimitar
     #             display: :full_name  # <-- i.e. Team.users[n].full_name
     #           },
     #           class: Team, # Optional; see below
-    #           find_with:      -> (scim_list_entry) {...}, # See below
-    #           find_all_with:  -> (scim_list_entries) {...} # Optional, See below
+    #           find_with:     -> (scim_list_entry) {...}, # See below
+    #           find_all_with: -> (scim_list_entries) {...} # Optional, See below
     #         }
     #       ],
     #       #...

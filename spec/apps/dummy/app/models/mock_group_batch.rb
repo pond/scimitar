@@ -11,7 +11,7 @@ class MockGroupBatch < MockGroup
           # Minimal mock: assume user-only entries (type omitted => User)
           find_all_with: -> (entries) do
             ids = entries.map { |e| e['value'] }
-            users = MockUser.where(primary_key: ids).to_a
+            MockUser.where(primary_key: ids).to_a
           end
         }
       ]
