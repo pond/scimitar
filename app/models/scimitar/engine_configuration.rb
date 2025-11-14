@@ -12,6 +12,7 @@ module Scimitar
       :basic_authenticator,
       :token_authenticator,
       :custom_authenticator,
+      :custom_request_sanitizer,
       :application_controller_mixin,
       :exception_reporter,
       :optional_value_fields_required,

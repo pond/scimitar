@@ -64,7 +64,7 @@ Some aspects of configuration are handled via a `config/initializers/scimitar.rb
 Rails.application.config.to_prepare do
   Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
     # ...see subsections below for configuration options...
-  end
+  })
 end
 ```
 
@@ -184,7 +184,36 @@ Note that Okta has some [curious documentation on its use of `POST` vs `PATCH` f
 
 ### Google Workspace note
 
-Using SCIM with Google Workspace might only work for a subset of applications. Since web UIs for major service providers change very often, it doesn't make sense to provide extensive documentation here as it would get out of date quickly; you may have to figure out the setup as best you can using whatever current Google documentation exists for their system. There are [some notes which were relevant around mid-2025](https://github.com/pond/scimitar/issues/142#issuecomment-2699050541) (from when a workarond/fix was incorporated into Scimitar to allow it to work with Google Workspace) which may help you get started.
+Using SCIM with Google Workspace might only work for a subset of applications. Since web UIs for major service providers change very often, it doesn't make sense to provide extensive documentation here as it would get out of date quickly; you may have to figure out the setup as best you can using whatever current Google documentation exists for their system. There are [some notes which were relevant around mid-2025](https://github.com/pond/scimitar/issues/142#issuecomment-2699050541) (from when a workaround/fix was incorporated into Scimitar to allow it to work with Google Workspace) which may help you get started.
+
+### Request content type handling
+
+The correct content type for SCIM is `application/scim+json`. Scimitar tolerates some variants of this, rewriting things internally so that the request continues to be processed by the rest of the gem (including ending up in subclass code you write) under this media type, with a Rails request format of `:scim`. Sometimes, callers into SCIM endpoints might use a content type that Scimitar rejects. If so, you can configure a custom request sanitizer Proc (with a "z", in keeping with Rails spelling of "sanitize"):
+
+```ruby
+Rails.application.config.to_prepare do
+  Scimitar.engine_configuration = Scimitar::EngineConfiguration.new({
+
+    custom_request_sanitizer: Proc.new do | request |
+      #
+      # Examine e.g. 'request.media_type' and evaluate to a Symbol:
+      #
+      #   :success  - set the standard content type and ensure the Rails request
+      #               format is :scim; continue processing normally
+      #
+      #   :preserve - retain the existing content type and Rails request format;
+      #               continue processing normally
+      #
+      #   :fail     - the request format appears to be invalid; generate a 406
+      #               ("Not Acceptable") response
+      #
+    end
+
+  })
+end
+```
+
+The Proc is passed the [`ActionDispatch::Request`](https://api.rubyonrails.org/classes/ActionDispatch/Request.html) instance for the current request. It **must** evaluable to a Symbol as shown above. Typically, `:preserve` is only for very special use cases where you understand that the request headers and/or format might not match what other parts of Scimitar expect, but have written appropriate custom code elsewhere to deal with that.
 
 ### Data models
 

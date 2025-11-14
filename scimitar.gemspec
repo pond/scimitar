@@ -34,10 +34,10 @@ Gem::Specification.new do |s|
   end
 
   s.add_development_dependency 'debug',              '~>  1.11'
-  s.add_development_dependency 'rake',               '~> 13.2'
+  s.add_development_dependency 'rake',               '~> 13.3'
   s.add_development_dependency 'pg',                 '~>  1.6'
   s.add_development_dependency 'simplecov-rcov',     '~>  0.3'
-  s.add_development_dependency 'rdoc',               '~>  6.14'
+  s.add_development_dependency 'rdoc',               '~>  6.15'
   s.add_development_dependency 'warden',             '~>  1.2'
   s.add_development_dependency 'rspec-rails',        '~>  7.1'
   s.add_development_dependency 'warden-rspec-rails', '~>  0.3'

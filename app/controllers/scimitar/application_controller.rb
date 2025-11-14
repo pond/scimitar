@@ -93,19 +93,37 @@ module Scimitar
       #
       def require_scim
         scim_mime_type = Mime::Type.lookup_by_extension(:scim).to_s
+        failure_detail = "Only #{scim_mime_type} type is accepted."
 
-        if request.media_type.nil? || request.media_type.empty?
-          request.format = :scim
-          request.headers['CONTENT_TYPE'] = scim_mime_type
-        elsif request.media_type.downcase == scim_mime_type
-          request.format = :scim
-        elsif request.format == :scim
-          request.headers['CONTENT_TYPE'] = scim_mime_type
-        elsif request.media_type.downcase == 'application/json' && request.user_agent.start_with?('Google') # https://github.com/pond/scimitar/issues/142
-          request.format = :scim
-          request.headers["CONTENT_TYPE"] = scim_mime_type
-        else
-          handle_scim_error(ErrorResponse.new(status: 406, detail: "Only #{scim_mime_type} type is accepted."))
+        if Scimitar.engine_configuration.custom_request_sanitizer.is_a?(Proc)
+
+          result = Scimitar.engine_configuration.custom_request_sanitizer.call(request)
+          case result
+            when :fail
+              handle_scim_error(ErrorResponse.new(status: 406, detail: failure_detail))
+            when :preserve
+              # Do nothing
+            else
+              request.format = :scim
+              request.headers['CONTENT_TYPE'] = scim_mime_type
+          end
+
+        else # "if Scimitar.engine_configuration.custom_request_sanitizer.present?"
+
+          if request.media_type.nil? || request.media_type.empty?
+            request.format = :scim
+            request.headers['CONTENT_TYPE'] = scim_mime_type
+          elsif request.media_type.downcase == scim_mime_type
+            request.format = :scim
+          elsif request.format == :scim
+            request.headers['CONTENT_TYPE'] = scim_mime_type
+          elsif request.media_type.downcase == 'application/json' && request.user_agent&.start_with?('Google') # https://github.com/pond/scimitar/issues/142
+            request.format = :scim
+            request.headers["CONTENT_TYPE"] = scim_mime_type
+          else
+            handle_scim_error(ErrorResponse.new(status: 406, detail: failure_detail))
+          end
+
         end
       end
 

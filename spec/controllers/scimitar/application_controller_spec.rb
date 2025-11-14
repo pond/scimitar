@@ -435,6 +435,61 @@ RSpec.describe Scimitar::ApplicationController do
           expect(@exception.message).to eql('Only application/scim+json type is accepted.')
         end
       end # "context 'and with Google SCIM calls' do"
+
+      context 'and with a custom request sanitizer' do
+        around :each do | example |
+          original_configuration = Scimitar.engine_configuration.custom_request_sanitizer
+          Scimitar.engine_configuration.custom_request_sanitizer = Proc.new do | request |
+            case request.media_type
+              when 'application/json+success'
+                :success
+              when 'application/json+preserve'
+                :preserve
+              else
+                :fail
+            end
+          end
+          example.run()
+        ensure
+          Scimitar.engine_configuration.custom_request_sanitizer = original_configuration
+        end
+
+        context 'returning "success"' do
+          it 'reaches the controller action with cleaned up request data' do
+            request.headers['Content-Type'] = 'application/json+success'
+            get :index
+
+            expect(@exception).to be_a(RuntimeError)
+            expect(@exception.message).to eql('Bang')
+
+            expect(request.format == :scim).to eql(true)
+            expect(request.headers['CONTENT_TYPE']).to eql('application/scim+json')
+          end
+        end # "context 'returning "success"' do"
+
+        context 'returning "preserve"' do
+          it 'reaches the controller action with unmodified request data' do
+            request.headers['Content-Type'] = 'application/json+preserve'
+            get :index
+
+            expect(@exception).to be_a(RuntimeError)
+            expect(@exception.message).to eql('Bang')
+
+            expect(request.format == :html).to eql(true)
+            expect(request.headers['CONTENT_TYPE']).to eql('application/json+preserve')
+          end
+        end # "context 'returning "keep"' do"
+
+        context 'returning "fail"' do
+          it 'is invoked' do
+            request.headers['Content-Type'] = 'application/json+fail'
+            get :index
+
+            expect(@exception).to be_a(Scimitar::ErrorResponse)
+            expect(@exception.message).to eql('Only application/scim+json type is accepted.')
+          end
+        end # "context 'returning "fail"' do"
+      end # "context 'and with a custom request sanitizer' do"
     end # "context 'exception reporter' do"
   end # "context 'error handling' do"
 end
