@@ -1,3 +1,9 @@
+# 2.14.0 (2025-11-14)
+
+Features:
+
+* If something is calling your SCIM API with an unsupported content type but you still want to accept those requests, you can now configure a custom request sanitizer - addresses [a request from #161](https://github.com/pond/scimitar/pull/161#discussion_r2487464453) from `@aerodynamik` via [#166](https://github.com/pond/scimitar/pull/166)
+
 # 2.13.0 (2025-09-12)
 
 Fixes:
