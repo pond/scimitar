@@ -102,7 +102,9 @@ Rails.application.config.to_prepare do # (required for >= Rails 7 / Zeitwerk)
     # JSON response to the API caller. If you want exceptions to also be
     # reported to a third party system such as sentry.io or raygun.com, you can
     # configure a Proc to do so. It is passed a Ruby exception subclass object.
-    # For example, a minimal sentry.io reporter might do this:
+    # The Proc is called via 'instance_exec' in the controller context, so you
+    # have access to things like 'request', 'params' and 'action_name'. For
+    # example, a minimal sentry.io reporter might do this:
     #
     #     exception_reporter: Proc.new do | exception |
     #       Sentry.capture_exception(exception)
