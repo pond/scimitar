@@ -292,6 +292,92 @@ RSpec.describe Scimitar::ActiveRecordBackedResourcesController do
         usernames = result['Resources'].map { |resource| resource['userName'] }
         expect(usernames).to match_array(['2', '3'])
       end
+
+      # SCIM 2.0 RFC 7644 Section 3.4.2.4: count=0 support
+      context 'with count=0' do
+        it 'returns 200 OK' do
+          get '/Users', params: {
+            format: :scim,
+            count: 0
+          }
+
+          expect(response.status).to eql(200)
+          expect(response.headers['Content-Type']).to eql('application/scim+json; charset=utf-8')
+        end
+
+        it 'returns totalResults with actual count' do
+          get '/Users', params: {
+            format: :scim,
+            count: 0
+          }
+
+          result = JSON.parse(response.body)
+          expect(result['totalResults']).to eql(3)
+        end
+
+        it 'returns itemsPerPage as 0' do
+          get '/Users', params: {
+            format: :scim,
+            count: 0
+          }
+
+          result = JSON.parse(response.body)
+          expect(result['itemsPerPage']).to eql(0)
+        end
+
+        it 'returns empty Resources array' do
+          get '/Users', params: {
+            format: :scim,
+            count: 0
+          }
+
+          result = JSON.parse(response.body)
+          expect(result['Resources']).to eql([])
+        end
+
+        it 'respects startIndex parameter' do
+          get '/Users', params: {
+            format: :scim,
+            count: 0,
+            startIndex: 5
+          }
+
+          result = JSON.parse(response.body)
+          expect(result['startIndex']).to eql(5)
+        end
+
+        it 'applies filters when calculating totalResults' do
+          get '/Users', params: {
+            format: :scim,
+            count: 0,
+            filter: 'name.familyName eq "Bar"'
+          }
+
+          result = JSON.parse(response.body)
+          expect(result['totalResults']).to eql(1)
+          expect(result['Resources']).to eql([])
+        end
+
+        it 'does not query for records (performance optimization)' do
+          # We should get the count but not fetch records
+          query_double = instance_double(ActiveRecord::Relation)
+          allow(MockUser).to receive(:all).and_return(query_double)
+          allow(query_double).to receive(:count).and_return(3)
+
+          # Should NOT call order, offset, limit, or to_a when count=0
+          expect(query_double).not_to receive(:order)
+          expect(query_double).not_to receive(:offset)
+          expect(query_double).not_to receive(:limit)
+          expect(query_double).not_to receive(:to_a)
+
+          get '/Users', params: {
+            format: :scim,
+            count: 0
+          }
+
+          expect(response.status).to eql(200)
+        end
+      end # "context 'with count=0' do"
     end # "context 'with items' do"
 
     context 'with bad calls' do

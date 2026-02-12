@@ -34,12 +34,17 @@ RSpec.describe Scimitar::Lists::Count do
         expect { @instance.limit = 'A' }.to raise_error(RuntimeError)
       end
 
-      it 'complains about attempts to set zero values' do
-        expect { @instance.limit = '0' }.to raise_error(RuntimeError)
+      it 'allows count=0 per SCIM 2.0 specification (RFC 7644)' do
+        expect { @instance.limit = '0' }.to_not raise_error
+        expect(@instance.limit).to eql(0)
       end
 
-      it 'complains about attempts to set zero values' do
+      it 'allows count=0 as integer' do
+        expect { @instance.limit = 0 }.to_not raise_error
+        expect(@instance.limit).to eql(0)
+      end
 
+      it 'complains about attempts to set negative values' do
         expect { @instance.limit = '-10' }.to raise_error(RuntimeError)
       end
     end # "context 'on-read error checking' do"
