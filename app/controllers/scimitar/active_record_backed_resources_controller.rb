@@ -36,11 +36,17 @@ module Scimitar
 
       pagination_info = scim_pagination_info(query.count())
 
-      page_of_results = query
-        .order(@id_column => :asc)
-        .offset(pagination_info.offset)
-        .limit(pagination_info.limit)
-        .to_a()
+      # SCIM 2.0 RFC 7644: When count=0, return metadata only (no Resources).
+      # This avoids an unnecessary database query for record data.
+      page_of_results = if pagination_info.limit == 0
+        []
+      else
+        query
+          .order(@id_column => :asc)
+          .offset(pagination_info.offset)
+          .limit(pagination_info.limit)
+          .to_a()
+      end
 
       super(pagination_info, page_of_results) do | record |
         record_to_scim(record)

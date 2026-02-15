@@ -15,9 +15,12 @@ module Scimitar
 
       # Set a limit (page size) value.
       #
-      # +value+:: Integer value held in a String. Must be >= 1.
+      # +value+:: Integer value held in a String. Must be >= 0.
       #
-      # Raises exceptions if given non-numeric, zero or negative input.
+      # Per SCIM 2.0 RFC 7644 Section 3.4.2.4: "A value of '0' indicates that
+      # no resource results are to be returned except for 'totalResults'."
+      #
+      # Raises exceptions if given non-numeric or negative input.
       #
       def limit=(value)
         value = value&.to_s
@@ -25,7 +28,7 @@ module Scimitar
 
         validate_numericality(value)
         input = value.to_i
-        raise if input < 1
+        raise if input < 0
         @limit = input
       end
 
