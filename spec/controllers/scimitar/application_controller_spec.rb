@@ -352,8 +352,9 @@ RSpec.describe Scimitar::ApplicationController do
     context 'with an exception reporter' do
       around :each do | example |
         original_configuration = Scimitar.engine_configuration.exception_reporter
+        exceptions = @exceptions = []
         Scimitar.engine_configuration.exception_reporter = Proc.new do | exception |
-          @exception = exception
+          exceptions << exception
         end
         example.run()
       ensure
@@ -364,8 +365,8 @@ RSpec.describe Scimitar::ApplicationController do
         it 'is invoked' do
           get :index, params: { format: :scim }
 
-          expect(@exception).to be_a(RuntimeError)
-          expect(@exception.message).to eql('Bang')
+          expect(@exceptions.first).to be_a(RuntimeError)
+          expect(@exceptions.first.message).to eql('Bang')
         end
       end
 
@@ -379,8 +380,8 @@ RSpec.describe Scimitar::ApplicationController do
         it 'is invoked' do
           get :index, params: { format: :scim }
 
-          expect(@exception).to be_a(ActiveRecord::RecordNotFound)
-          expect(@exception.message).to eql('42')
+          expect(@exceptions.first).to be_a(ActiveRecord::RecordNotFound)
+          expect(@exceptions.first.message).to eql('42')
         end
       end
 
@@ -398,8 +399,8 @@ RSpec.describe Scimitar::ApplicationController do
         it 'is invoked' do
           get :index, params: { format: :scim }
 
-          expect(@exception).to be_a(ActionDispatch::Http::Parameters::ParseError)
-          expect(@exception.message).to eql('Hello')
+          expect(@exceptions.first).to be_a(ActionDispatch::Http::Parameters::ParseError)
+          expect(@exceptions.first.message).to eql('Hello')
         end
       end
 
@@ -412,8 +413,8 @@ RSpec.describe Scimitar::ApplicationController do
           request.headers['Content-Type'] = 'text/plain'
           get :index
 
-          expect(@exception).to be_a(Scimitar::ErrorResponse)
-          expect(@exception.message).to eql('Only application/scim+json type is accepted.')
+          expect(@exceptions.first).to be_a(Scimitar::ErrorResponse)
+          expect(@exceptions.first.message).to eql('Only application/scim+json type is accepted.')
         end
       end
 
@@ -423,16 +424,16 @@ RSpec.describe Scimitar::ApplicationController do
           request.headers['User-Agent'  ] = 'Google-Auto-Provisioning'
           get :index
 
-          expect(@exception).to be_a(RuntimeError)
-          expect(@exception.message).to eql('Bang')
+          expect(@exceptions.first).to be_a(RuntimeError)
+          expect(@exceptions.first.message).to eql('Bang')
         end
 
         it 'is invoked early for unrecognised agents' do
           request.headers['Content-Type'] = 'application/json'
           get :index
 
-          expect(@exception).to be_a(Scimitar::ErrorResponse)
-          expect(@exception.message).to eql('Only application/scim+json type is accepted.')
+          expect(@exceptions.first).to be_a(Scimitar::ErrorResponse)
+          expect(@exceptions.first.message).to eql('Only application/scim+json type is accepted.')
         end
       end # "context 'and with Google SCIM calls' do"
 
@@ -459,8 +460,8 @@ RSpec.describe Scimitar::ApplicationController do
             request.headers['Content-Type'] = 'application/json+success'
             get :index
 
-            expect(@exception).to be_a(RuntimeError)
-            expect(@exception.message).to eql('Bang')
+            expect(@exceptions.first).to be_a(RuntimeError)
+            expect(@exceptions.first.message).to eql('Bang')
 
             expect(request.format == :scim).to eql(true)
             expect(request.headers['CONTENT_TYPE']).to eql('application/scim+json')
@@ -472,8 +473,8 @@ RSpec.describe Scimitar::ApplicationController do
             request.headers['Content-Type'] = 'application/json+preserve'
             get :index
 
-            expect(@exception).to be_a(RuntimeError)
-            expect(@exception.message).to eql('Bang')
+            expect(@exceptions.first).to be_a(RuntimeError)
+            expect(@exceptions.first.message).to eql('Bang')
 
             expect(request.format == :html).to eql(true)
             expect(request.headers['CONTENT_TYPE']).to eql('application/json+preserve')
@@ -485,11 +486,28 @@ RSpec.describe Scimitar::ApplicationController do
             request.headers['Content-Type'] = 'application/json+fail'
             get :index
 
-            expect(@exception).to be_a(Scimitar::ErrorResponse)
-            expect(@exception.message).to eql('Only application/scim+json type is accepted.')
+            expect(@exceptions.first).to be_a(Scimitar::ErrorResponse)
+            expect(@exceptions.first.message).to eql('Only application/scim+json type is accepted.')
           end
         end # "context 'returning "fail"' do"
       end # "context 'and with a custom request sanitizer' do"
+
+      context 'evaluated in controller context' do
+        it 'has access to controller methods like request and params' do
+          reported_request_method = nil
+          reported_params = nil
+          Scimitar.engine_configuration.exception_reporter = Proc.new do | exception |
+            reported_request_method = request.method
+            reported_params = params
+          end
+
+          get :index, params: { format: :scim, foo: 'bar' }
+
+          expect(reported_request_method).to eql('GET')
+          expect(reported_params['format']).to eql('scim')
+          expect(reported_params['foo']).to eql('bar')
+        end
+      end
     end # "context 'exception reporter' do"
   end # "context 'error handling' do"
 end

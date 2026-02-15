@@ -48,7 +48,7 @@ module Scimitar
       #
       def handle_scim_error(error_response, exception = error_response)
         unless Scimitar.engine_configuration.exception_reporter.nil?
-          Scimitar.engine_configuration.exception_reporter.call(exception)
+          instance_exec(exception, &Scimitar.engine_configuration.exception_reporter)
         end
 
         render json: error_response, status: error_response.status
