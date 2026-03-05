@@ -612,7 +612,13 @@ module Scimitar
                   end
                 end
 
-                result.compact! if include_attributes.any?
+                if (
+                  include_attributes.any? or
+                  ! Scimitar.engine_configuration.render_mapped_nil_values_in_response
+                )
+                  result.compact!
+                end
+
                 result
 
               when Array # Static or dynamic mapping against lists in data source

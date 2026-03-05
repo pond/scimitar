@@ -1,3 +1,15 @@
+# 2.15.0 (2026-03-06)
+
+Fixes:
+
+* Supports SCIM 2.0 `count=0` parameter (RFC 7644 compliance improvement) via [#168](https://github.com/pond/scimitar/pull/168) - thanks to `@lorman`
+
+Features:
+
+* Ruby 4.0.1 added to the test matrix and therefore 'officially' supported
+* New engine configuration option `render_mapped_nil_values_in_response` allows omission of `nil` source value items from a SCIM representation, with some limitations; aims to solve [#170](https://github.com/pond/scimitar/issues/170) reported by `@xanderman`, but might need further iteration
+* Controller methods can be accessed in the `exception_reporter` Proc via [#167](https://github.com/pond/scimitar/pull/167) - thanks to `@bcroesch`
+
 # 2.14.0 (2025-11-14)
 
 Features:
