@@ -121,6 +121,12 @@ Rails.application.config.to_prepare do # (required for >= Rails 7 / Zeitwerk)
     #
     #     optional_value_fields_required: false
 
+    # When rendering responses, +nil+ values can either still be included via
+    # the attributes map with a JSON value of +null+, or omitted. By default,
+    # all attributes in your map are returned in responses.
+    #
+    #     render_mapped_nil_values_in_response: false
+
     # The SCIM standard `/Schemas` endpoint lists, by default, all known schema
     # definitions with the mutabilty (read-write, read-only, write-only) state
     # described by those definitions, and includes all defined attributes. For

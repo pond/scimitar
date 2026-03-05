@@ -267,7 +267,7 @@ RSpec.describe Scimitar::Resources::Mixin do
           instance.first_name         = 'Foo'
           instance.last_name          = 'Bar'
           instance.work_email_address = 'foo.bar@test.com'
-          instance.home_email_address = nil
+          instance.home_email_address = 'foo.bar@example.com'
           instance.work_phone_number  = '+642201234567'
           instance.organization       = 'SOMEORG'
 
@@ -286,6 +286,49 @@ RSpec.describe Scimitar::Resources::Mixin do
             'id'          => uuid,
             'userName'    => 'foo',
             'name'        => {'givenName'=>'Foo', 'familyName'=>'Bar'},
+            'groups'      => [{'display'=>g1.display_name, 'value'=>g1.id.to_s}, {'display'=>g3.display_name, 'value'=>g3.id.to_s}],
+            'meta'        => {'location'=>"https://test.com/mock_users/#{uuid}", 'resourceType'=>'User'},
+            'schemas'     => [
+              'urn:ietf:params:scim:schemas:core:2.0:User',
+              'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+              'urn:ietf:params:scim:schemas:extension:manager:1.0:User',
+            ],
+            'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User' => {
+              'organization' => 'SOMEORG',
+            },
+            'urn:ietf:params:scim:schemas:extension:manager:1.0:User' => {},
+          })
+        end
+
+        it 'hides "nil" value attributes' do
+          uuid                        = SecureRandom.uuid
+
+          instance                    = MockUser.new
+          instance.primary_key        = uuid
+          instance.scim_uid           = 'AA02984'
+          instance.username           = nil
+          instance.password           = 'correcthorsebatterystaple'
+          instance.first_name         = nil
+          instance.last_name          = 'Bar'
+          instance.work_email_address = 'foo.bar@test.com'
+          instance.home_email_address = 'foo.bar@example.com'
+          instance.work_phone_number  = '+642201234567'
+          instance.organization       = 'SOMEORG'
+
+          g1 = MockGroup.create!(display_name: 'Group 1')
+          g2 = MockGroup.create!(display_name: 'Group 2')
+          g3 = MockGroup.create!(display_name: 'Group 3')
+
+          g1.mock_users << instance
+          g3.mock_users << instance
+
+          scim = instance.to_scim(location: "https://test.com/mock_users/#{uuid}", include_attributes: %w[id userName name groups.display groups.value organization])
+          json = scim.to_json()
+          hash = JSON.parse(json)
+
+          expect(hash).to eql({
+            'id'          => uuid,
+            'name'        => {'familyName'=>'Bar'},
             'groups'      => [{'display'=>g1.display_name, 'value'=>g1.id.to_s}, {'display'=>g3.display_name, 'value'=>g3.id.to_s}],
             'meta'        => {'location'=>"https://test.com/mock_users/#{uuid}", 'resourceType'=>'User'},
             'schemas'     => [
@@ -332,7 +375,7 @@ RSpec.describe Scimitar::Resources::Mixin do
             'userName'    => 'foo',
             'name'        => {'givenName'=>'Foo', 'familyName'=>'Bar'},
             'active'      => true,
-            'emails'      => [{'type'=>'work', 'primary'=>true, 'value'=>'foo.bar@test.com'}, {"primary"=>false, "type"=>"home", "value"=>nil}],
+            'emails'      => [{'type'=>'work', 'primary'=>true, 'value'=>'foo.bar@test.com'}, {'primary'=>false, 'type'=>'home', 'value'=>nil}],
             'phoneNumbers'=> [{'type'=>'work', 'primary'=>false, 'value'=>'+642201234567'}],
             'id'          => uuid,
             'externalId'  => 'AA02984',
@@ -353,6 +396,71 @@ RSpec.describe Scimitar::Resources::Mixin do
             },
           })
         end
+
+        context 'and when configured to omit "nil" values in the response' do
+          around :each do | example |
+            original_configuration = Scimitar.engine_configuration.render_mapped_nil_values_in_response
+            Scimitar.engine_configuration.render_mapped_nil_values_in_response = false
+            example.run()
+          ensure
+            Scimitar.engine_configuration.render_mapped_nil_values_in_response = original_configuration
+          end
+
+          it 'omits "nil" values as expected' do
+            uuid                        = SecureRandom.uuid
+
+            instance                    = MockUser.new
+            instance.primary_key        = uuid
+            instance.scim_uid           = 'AA02984'
+            instance.username           = 'foo'
+            instance.password           = 'correcthorsebatterystaple'
+            instance.first_name         = nil
+            instance.last_name          = 'Bar'
+            instance.work_email_address = 'foo.bar@test.com'
+            instance.home_email_address = nil
+            instance.work_phone_number  = '+642201234567'
+            instance.organization       = 'SOMEORG'
+
+            g1 = MockGroup.create!(display_name: 'Group 1')
+            g2 = MockGroup.create!(display_name: 'Group 2')
+            g3 = MockGroup.create!(display_name: 'Group 3')
+
+            g1.mock_users << instance
+            g3.mock_users << instance
+
+            scim = instance.to_scim(location: "https://test.com/mock_users/#{uuid}")
+            json = scim.to_json()
+            hash = JSON.parse(json)
+
+            # Note currently limited implementation for things like static maps,
+            # where part of the returned value is included; in this case, the
+            # "primary" value is "false" for e-mail of type "home", so the
+            # structure for that *does* appear in the output array even though
+            # the source dynamic data field from the NockUser instance is "nil".
+            #
+            expect(hash).to eql({
+              'userName'    => 'foo',
+              'name'        => {'familyName'=>'Bar'},
+              'active'      => true,
+              'emails'      => [{'type'=>'work', 'primary'=>true, 'value'=>'foo.bar@test.com'}, {'primary' => false, 'type' => 'home'}],
+              'phoneNumbers'=> [{'type'=>'work', 'primary'=>false, 'value'=>'+642201234567'}],
+              'id'          => uuid,
+              'externalId'  => 'AA02984',
+              'groups'      => [{'display'=>g1.display_name, 'value'=>g1.id.to_s}, {'display'=>g3.display_name, 'value'=>g3.id.to_s}],
+              'meta'        => {'location'=>"https://test.com/mock_users/#{uuid}", 'resourceType'=>'User'},
+              'schemas'     => [
+                'urn:ietf:params:scim:schemas:core:2.0:User',
+                'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+                'urn:ietf:params:scim:schemas:extension:manager:1.0:User',
+              ],
+              'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User' => {
+                'organization' => 'SOMEORG',
+                'primaryEmail' => instance.work_email_address,
+              },
+              'urn:ietf:params:scim:schemas:extension:manager:1.0:User' => {}
+            })
+          end
+        end # "context 'and when configured to omit "nil" values in the response'" do"
       end # "context 'with a UUID, renamed primary key column' do"
 
       context 'with an integer, conventionally named primary key column' do

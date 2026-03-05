@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.date        = Scimitar::DATE
   s.summary     = 'SCIM v2 for Rails'
   s.description = 'SCIM v2 support for Users and Groups in Ruby On Rails'
-  s.authors     = ['RIPA Global', 'Andrew David Hodgkinson']
+  s.authors     = ['Andrew David Hodgkinson', 'RIPA Global']
   s.email       = ['ahodgkin@rowing.org.uk']
   s.license     = 'MIT'
 
@@ -37,7 +37,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rake',               '~> 13.3'
   s.add_development_dependency 'pg',                 '~>  1.6'
   s.add_development_dependency 'simplecov-rcov',     '~>  0.3'
-  s.add_development_dependency 'rdoc',               '~>  6.15'
+  s.add_development_dependency 'rdoc',               '~>  7.2'
   s.add_development_dependency 'warden',             '~>  1.2'
   s.add_development_dependency 'rspec-rails',        '~>  7.1'
   s.add_development_dependency 'warden-rspec-rails', '~>  0.3'
