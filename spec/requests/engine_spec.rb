@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'open3'
 
 RSpec.describe Scimitar::Engine do
   before :each do
@@ -6,6 +7,30 @@ RSpec.describe Scimitar::Engine do
   end
 
   context 'parameter parser' do
+
+    [false, true].each do |frozen_registry|
+      it "registers with a #{frozen_registry ? 'frozen' : 'mutable'} parser registry" do
+        skip 'Rails freezes the parser registry' if !frozen_registry && ActionDispatch::Request.parameter_parsers.frozen?
+
+        output, errors, status = Open3.capture3(RbConfig.ruby, '-Ilib', '-e', <<~RUBY)
+          require 'action_controller/railtie'
+          require 'stringio'
+          registry = ActionDispatch::Request.parameter_parsers
+          registry.freeze if #{frozen_registry}
+          require 'scimitar'
+          registry[:scim] = ->(body) { { 'userName' => 'configured' } } unless #{frozen_registry}
+          body = '{"userName":"original"}'
+          request = ActionDispatch::Request.new(
+            'REQUEST_METHOD' => 'POST', 'CONTENT_TYPE' => 'application/scim+json',
+            'CONTENT_LENGTH' => body.bytesize.to_s, 'rack.input' => StringIO.new(body)
+          )
+          puts JSON.generate(request.request_parameters.to_h)
+        RUBY
+
+        expect(status.success?).to eql(true), errors
+        expect(JSON.parse(output)).to eql('userName' => frozen_registry ? 'original' : 'configured')
+      end
+    end
 
     # "params" given here as a String, expecting the engine's custom parser to
     # decode it for us.

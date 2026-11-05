@@ -11,9 +11,12 @@ module Scimitar
 
     Mime::Type.register 'application/scim+json', :scim
 
-    ActionDispatch::Request.parameter_parsers[Mime::Type.lookup('application/scim+json').symbol] = lambda do |body|
+    parsers = ActionDispatch::Request.parameter_parsers
+    updated_parsers = parsers.frozen? ? parsers.dup : parsers
+    updated_parsers[Mime::Type.lookup('application/scim+json').symbol] = lambda do |body|
       JSON.parse(body)
     end
+    ActionDispatch::Request.parameter_parsers = updated_parsers if parsers.frozen?
 
     # Return an Array of all supported default and custom resource classes.
     # See also :add_custom_resource and :set_default_resources.
